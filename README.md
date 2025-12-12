@@ -1,4 +1,4 @@
-# 🐍 TANGLE GAME (The Tangle)
+# 🐍 THE TANGLE
 
 ![Status](https://img.shields.io/badge/Status-Finished-success)
 ![Tech](https://img.shields.io/badge/Built%20With-HTML5%20%7C%20CSS3%20%7C%20JS-blueviolet)
@@ -81,3 +81,4 @@ const SETTINGS = {
 
 
 const GAME_SPEED = 2;   // Vitesse de déplacement
+
