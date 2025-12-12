@@ -12,7 +12,7 @@
 
 Le jeu se distingue par son ambiance **Dark Synthwave**, son moteur audio procédural (Chiptune généré par le code) et ses visuels néons fluides.
 
-![Aperçu du jeu](assets/game-preview.png)
+<img width="2554" height="1269" alt="game-preview" src="https://github.com/user-attachments/assets/a61c5a9b-4a0c-4dcb-851a-3c95704ff2b7"/>
 
 ## ✨ Fonctionnalités
 
@@ -41,7 +41,7 @@ Ce projet est statique, il ne nécessite aucun serveur backend (Node.js, PHP, et
 
 1.  **Cloner le projet :**
     ```bash
-    git clone [https://github.com/votre-nom/tangle-game.git](https://github.com/votre-nom/tangle-game.git)
+    git clone [https://github.com/goken-0/thetangle.git](https://github.com/goken-0/thetangle.git)
     ```
 2.  **Lancer le jeu :**
     * Ouvrez simplement le fichier `index.html` dans votre navigateur web (Chrome, Firefox, Edge).
@@ -78,5 +78,6 @@ const SETTINGS = {
     baseSize: 16,       // Épaisseur du serpent
     glow: true          // Effet néon (true/false)
 };
+
 
 const GAME_SPEED = 2;   // Vitesse de déplacement
