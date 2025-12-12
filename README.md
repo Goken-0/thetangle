@@ -59,7 +59,6 @@ Portfolio/
 │
 ├── index.html                  # Page HTML du jeu
 │
-├── DOCUMENTATION.txt           # Documentation technique du projet
 └── README.md                   # Ce fichier (présentation du projet)
 ```
 
@@ -81,4 +80,5 @@ const SETTINGS = {
 
 
 const GAME_SPEED = 2;   // Vitesse de déplacement
+
 
