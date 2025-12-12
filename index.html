@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE TANGLE</title>
+    <link rel="icon" type="image/x-icon" href="favicon/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
+    <link rel="android-chrome" type="image/png" sizes="512x512" href="favicon/android-chrome-512x512.png">
+    <link rel="android-chrome" sizes="192x192" href="favicon/android-chrome-192x192.png">
+    <link rel="manifest" href="favicon/site.webmanifest">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <div class="main-wrapper">
+        <header class="page-header">
+            <h1>TANGLE GAME <span class="version">FINAL</span></h1>
+        </header>
+
+        <div id="fullscreenRoot" class="fs-root">
+
+            <div class="game-box">
+
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <div class="status-light"></div>
+                        <span class="sys-text">READY</span>
+                    </div>
+
+                    <div class="toolbar-center">
+                        <span id="speedDisplay">POWERED BY GOKEN</span>
+                    </div>
+
+                    <div class="toolbar-right">
+                        <div class="volume-wrapper">
+                            <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.1"
+                                value="0.5">
+                            <button id="muteBtn" class="tool-btn" title="Volume">
+                                <i class="fa-solid fa-volume-high"></i>
+                            </button>
+                        </div>
+
+                        <button id="fullscreenBtn" class="tool-btn" title="Plein écran">
+                            <i class="fa-solid fa-expand"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="canvas-wrapper">
+
+                    <div class="hud">
+                        <div class="hud-item">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <polygon fill="none" stroke="currentColor" stroke-width="2"
+                                    points="12 2 21 7 21 17 12 22 3 17 3 7" />
+                                <circle cx="12" cy="12" r="3" fill="currentColor" />
+                            </svg>
+                            <span id="score">000</span>
+                        </div>
+                    </div>
+
+                    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+                    <div id="startScreen" class="overlay">
+                        <div class="panel">
+                            <h2>INSERT COIN</h2>
+                            <p class="blink">PRESS START</p>
+                            <div class="keys-hint">
+                                <div class="k-group">
+                                    <div class="k">Z</div>
+                                    <div class="k-row">
+                                        <div class="k">Q</div>
+                                        <div class="k">S</div>
+                                        <div class="k">D</div>
+                                    </div>
+                                </div>
+                                <div class="or">OU</div>
+                                <div class="k-group">
+                                    <div class="k">↑</div>
+                                    <div class="k-row">
+                                        <div class="k">←</div>
+                                        <div class="k">↓</div>
+                                        <div class="k">→</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button id="startBtn">START GAME</button>
+                        </div>
+                    </div>
+
+                    <div id="gameOverScreen" class="overlay hidden">
+                        <div class="panel error">
+                            <h2>GAME OVER</h2>
+                            <p>SCORE: <span id="finalScore">0</span></p>
+                            <button id="restartBtn">TRY AGAIN</button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="footer-bar">
+                    INITIATED PROTOCOL
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/game.js"></script>
+</body>
+
+</html>
