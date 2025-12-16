@@ -80,5 +80,7 @@ const SETTINGS = {
 
 
 const GAME_SPEED = 2;   // Vitesse de déplacement
+```
 
+<div align="center"> <small>Fait avec ❤️ par Goken-0 - 2025</small> </div>
 
