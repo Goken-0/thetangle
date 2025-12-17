@@ -64,14 +64,22 @@
                             </svg>
                             <span id="score">000</span>
                         </div>
+
+                        <div class="hud-item stamina-container">
+                            <span class="sys-text">DASH</span>
+                            <div class="stamina-bar-bg">
+                                <div id="staminaBar" class="stamina-bar-fill"></div>
+                            </div>
+                        </div>
                     </div>
 
-                    <canvas id="gameCanvas" width="800" height="600"></canvas>
+                    <canvas id="gameCanvas" width="800" height="576"></canvas>
 
                     <div id="startScreen" class="overlay">
                         <div class="panel">
                             <h2>INSERT COIN</h2>
                             <p class="blink">PRESS START</p>
+
                             <div class="keys-hint">
                                 <div class="k-group">
                                     <div class="k">Z</div>
@@ -91,6 +99,12 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="action-hint">
+                                <div class="k k-space">ESPACE</div>
+                                <span class="action-label">= DASH</span>
+                            </div>
+
                             <button id="startBtn">START GAME</button>
                         </div>
                     </div>
