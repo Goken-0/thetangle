@@ -1,14 +1,18 @@
 // === CONFIGURATION ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+// On met en cache l'élément score pour ne pas le rechercher à chaque fois
+const scoreElement = document.getElementById('score');
 
+// Réglages (Grille 32px pour fluidité parfaite)
 const SETTINGS = {
-    grid: 40,
-    baseSize: 16, // Taille des modules du corps
+    grid: 32,
+    baseSize: 14, 
     glow: true
 };
 
-const GAME_SPEED = 2; // Vitesse constante
+const BASE_SPEED = 2; // Vitesse normale
+const DASH_SPEED = 4; // Vitesse turbo (Doit être un diviseur de 32 : 4, 8, 16)
 
 // État Global
 let state = {
@@ -18,26 +22,36 @@ let state = {
     volume: 0.5,
     frames: 0,
     width: 800,
-    height: 600,
-    cols: 20,
-    rows: 15
+    height: 576, 
+    cols: 25,
+    rows: 18
 };
 
 // Entités
-let snake = { x: 0, y: 0, vx: 0, vy: 0, inputQueue: [], trail: [] };
+let snake = { 
+    x: 0, y: 0, 
+    vx: 0, vy: 0, 
+    inputQueue: [], 
+    trail: [],
+    // Nouveautés Dash
+    dashing: false,
+    stamina: 100,      // 0 à 100
+    canDash: true
+};
+
 let energy = { x: 0, y: 0, angle: 0 };
 let particles = [];
 let circuitLines = []; 
 
-// === MOTEUR AUDIO (AMBIANCE DARK SYNTHWAVE) ===
+// === MOTEUR AUDIO ===
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx = new AudioContext();
 let musicInterval = null;
 let musicStep = 0;
 
 const Sound = {
-    // Générateur de sons (Oscillateur)
-    playTone: (freq, type, duration, vol = 0.1, slideTo = null) => {
+    // AJOUT du paramètre 'delay' à la fin
+    playTone: (freq, type, duration, vol = 0.1, slideTo = null, delay = 0) => {
         if (state.muted) return;
         if (audioCtx.state === 'suspended') audioCtx.resume();
         
@@ -45,25 +59,29 @@ const Sound = {
         const gain = audioCtx.createGain();
         const globalVol = state.volume;
         
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        // On calcule le temps exact de départ (maintenant + délai)
+        const startTime = audioCtx.currentTime + delay;
+        const endTime = startTime + duration;
         
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, startTime);
         if (slideTo) {
-            osc.frequency.exponentialRampToValueAtTime(slideTo, audioCtx.currentTime + duration);
+            osc.frequency.exponentialRampToValueAtTime(slideTo, endTime);
         }
 
-        gain.gain.setValueAtTime(vol * globalVol, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        gain.gain.setValueAtTime(vol * globalVol, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, endTime);
 
         osc.connect(gain);
         gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
+        
+        osc.start(startTime);
+        osc.stop(endTime);
     },
     
-    // Générateur de Bruit Blanc (Pour les percussions rétro)
     playNoise: (duration, vol = 0.1) => {
         if (state.muted) return;
+        // Création optimisée du buffer (seulement si nécessaire)
         const bufferSize = audioCtx.sampleRate * duration;
         const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
@@ -74,7 +92,6 @@ const Sound = {
         const gain = audioCtx.createGain();
         const globalVol = state.volume;
 
-        // Enveloppe percussive (Fort au début, coupe net)
         gain.gain.setValueAtTime(vol * globalVol, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
         
@@ -83,29 +100,20 @@ const Sound = {
         noise.start();
     },
     
-    // --- BRUITAGES ---
+    move: () => { Sound.playTone(800, 'triangle', 0.02, 0.02); },
+    dash: () => { Sound.playNoise(0.1, 0.05); Sound.playTone(200, 'sawtooth', 0.2, 0.1, 600); },
     
-    move: () => {
-        // Petit "blip" sec
-        Sound.playTone(800, 'triangle', 0.02, 0.02);
-    },
-    
-    eat: () => {
-        // Le "Bling" classique
+    // CORRECTION ICI : Plus de setTimeout ! On programme la 2ème note 60ms (0.06s) plus tard via l'API Audio
+    eat: () => { 
         Sound.playTone(1200, 'square', 0.08, 0.1); 
-        setTimeout(() => Sound.playTone(1800, 'square', 0.1, 0.1), 60); 
+        Sound.playTone(1800, 'square', 0.1, 0.1, null, 0.06); 
     },
     
-    crash: () => {
-        // Shutdown grave
-        Sound.playTone(150, 'sawtooth', 1.0, 0.4, 10); 
-    },
+    crash: () => { Sound.playTone(150, 'sawtooth', 1.0, 0.4, 10); },
 
-    // --- MUSIQUE (Chiptune GameBoy Style) ---
     startMusic: () => {
         if (musicInterval) clearInterval(musicInterval);
         musicStep = 0;
-        // Tempo entrainant (150ms)
         musicInterval = setInterval(Sound.sequencer, 150); 
     },
     
@@ -116,27 +124,20 @@ const Sound = {
     sequencer: () => {
         if (state.muted || !state.running) return;
         
-        // Boucle de 16 temps
         const s = musicStep % 16;
+        if (snake.dashing && s % 2 === 0) Sound.playNoise(0.05, 0.1);
+
+        if (s % 4 === 0) Sound.playNoise(0.1, 0.2); 
+        if (s % 8 === 4) Sound.playNoise(0.15, 0.15); 
         
-        // --- PERCUSSIONS (Noise) ---
-        // Kick (Temps 0, 4, 8, 12) et Snare (Temps 4, 12)
-        if (s % 4 === 0) Sound.playNoise(0.1, 0.2); // Kick
-        if (s % 8 === 4) Sound.playNoise(0.15, 0.15); // Snare accentué
-        
-        // --- BASSE (Triangle) ---
-        // Ligne de basse qui "marche"
-        const root = 110; // La
+        const root = 110; 
         if (s === 0 || s === 2) Sound.playTone(root, 'triangle', 0.1, 0.3);
-        if (s === 8 || s === 10) Sound.playTone(root * 1.5, 'triangle', 0.1, 0.3); // Mi
+        if (s === 8 || s === 10) Sound.playTone(root * 1.5, 'triangle', 0.1, 0.3); 
         
-        // --- MÉLODIE (Square - La voix "Nintendo") ---
-        // Petite mélodie répétitive et joyeuse
-        if (s === 0) Sound.playTone(440, 'square', 0.1, 0.05); // La
-        if (s === 2) Sound.playTone(554, 'square', 0.1, 0.05); // Do#
-        if (s === 4) Sound.playTone(659, 'square', 0.1, 0.05); // Mi
+        if (s === 0) Sound.playTone(440, 'square', 0.1, 0.05); 
+        if (s === 2) Sound.playTone(554, 'square', 0.1, 0.05); 
+        if (s === 4) Sound.playTone(659, 'square', 0.1, 0.05); 
         
-        // Petit arpège rapide à la fin de la mesure
         if (s === 14) Sound.playTone(880, 'square', 0.05, 0.05);
         if (s === 15) Sound.playTone(659, 'square', 0.05, 0.05);
 
@@ -148,8 +149,9 @@ const Sound = {
 function init() {
     initBackground();
     
-    // Listeners
     window.addEventListener('keydown', handleInput);
+    window.addEventListener('keyup', handleInputRelease); // Pour relâcher le Dash
+    
     document.getElementById('startBtn').addEventListener('click', startGame);
     document.getElementById('restartBtn').addEventListener('click', startGame);
     
@@ -157,6 +159,16 @@ function init() {
     document.getElementById('volumeSlider').addEventListener('input', updateVolume);
     document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
     
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            Sound.stopMusic();
+        } else {
+            if (state.running && (snake.vx !== 0 || snake.vy !== 0)) {
+                Sound.startMusic();
+            }
+        }
+    });
+
     requestAnimationFrame(loop);
 }
 
@@ -187,19 +199,24 @@ function startGame() {
     
     snake.x = startCol * SETTINGS.grid;
     snake.y = startRow * SETTINGS.grid;
-    snake.vx = GAME_SPEED;
+    snake.vx = 0;
     snake.vy = 0;
     
-    snake.inputQueue = [{x: 1, y: 0}];
+    snake.inputQueue = []; 
     snake.trail = [];
-    // Queue de démarrage courte (3 segments environ)
-    for(let i=0; i<12; i++) {
-        snake.trail.push({ x: snake.x - i*GAME_SPEED, y: snake.y });
+    
+    // Reset Dash
+    snake.dashing = false;
+    snake.stamina = 100;
+    updateStaminaUI();
+    
+    for(let i=0; i<3; i++) {
+        snake.trail.push({ x: snake.x, y: snake.y });
     }
     
     particles = [];
     spawnEnergy();
-    Sound.startMusic();
+    Sound.stopMusic();
 }
 
 // === LOGIQUE ===
@@ -216,30 +233,71 @@ function loop() {
 }
 
 function updateSnake() {
+    // Gestion de l'énergie (Stamina)
+    if (snake.dashing) {
+        snake.stamina -= 2; // Ça descend vite
+        if (snake.stamina <= 0) {
+            snake.stamina = 0;
+            snake.dashing = false;
+        }
+        if (state.frames % 5 === 0) spawnParticle(snake.x + 16, snake.y + 16, '#00ffff'); // Particules bleues
+    } else {
+        snake.stamina += 0.5; // Recharge lente
+        if (snake.stamina > 100) snake.stamina = 100;
+    }
+    updateStaminaUI();
+
+    // Vitesse actuelle (2 ou 4)
+    const currentSpeed = snake.dashing ? DASH_SPEED : BASE_SPEED;
+
+    if (snake.vx === 0 && snake.vy === 0) return;
+
+    // Détection intersection pour tourner
     const atIntersection = (snake.x % SETTINGS.grid === 0) && (snake.y % SETTINGS.grid === 0);
     
     if (atIntersection) {
         if (snake.inputQueue.length > 0) {
             const next = snake.inputQueue.shift();
-            snake.vx = next.x * GAME_SPEED;
-            snake.vy = next.y * GAME_SPEED;
+            snake.vx = next.x * currentSpeed;
+            snake.vy = next.y * currentSpeed;
         } else {
-            if(snake.vx !== 0) snake.vx = Math.sign(snake.vx) * GAME_SPEED;
-            if(snake.vy !== 0) snake.vy = Math.sign(snake.vy) * GAME_SPEED;
+            // Si pas de nouvelle commande, on ajuste juste la vitesse actuelle
+            // pour être sûr qu'on ne reste pas bloqué sur une vitesse incompatible
+            if (snake.vx !== 0) snake.vx = Math.sign(snake.vx) * currentSpeed;
+            if (snake.vy !== 0) snake.vy = Math.sign(snake.vy) * currentSpeed;
         }
+    } else {
+        // Si on est au milieu d'une case et qu'on dash, on met à jour la vitesse instantanément
+        // MAIS seulement si on reste aligné (horizontal/vertical)
+        if (snake.vx !== 0) snake.vx = Math.sign(snake.vx) * currentSpeed;
+        if (snake.vy !== 0) snake.vy = Math.sign(snake.vy) * currentSpeed;
     }
     
     snake.x += snake.vx;
     snake.y += snake.vy;
     snake.trail.unshift({ x: snake.x, y: snake.y });
     
-    // Longueur : Base + Score
-    const targetLength = (3 + state.score) * (SETTINGS.grid / GAME_SPEED); 
+    const targetLength = (3 + state.score) * (SETTINGS.grid / currentSpeed); 
     if (snake.trail.length > targetLength) snake.trail.pop();
+}
+
+function updateStaminaUI() {
+    const bar = document.getElementById('staminaBar');
+    bar.style.width = snake.stamina + '%';
+    if (snake.stamina < 20) bar.classList.add('stamina-low');
+    else bar.classList.remove('stamina-low');
 }
 
 function handleInput(e) {
     if (!state.running) return;
+
+    // --- GESTION DU DASH (ESPACE) ---
+    if (e.code === 'Space') {
+        if (snake.stamina > 10) { // Il faut un minimum d'énergie pour lancer
+            if (!snake.dashing) Sound.dash();
+            snake.dashing = true;
+        }
+    }
     
     const up = e.code === 'ArrowUp' || e.code === 'KeyW' || e.key === 'z' || e.key === 'Z';
     const down = e.code === 'ArrowDown' || e.code === 'KeyS' || e.key === 's' || e.key === 'S';
@@ -248,11 +306,21 @@ function handleInput(e) {
 
     if (!up && !down && !left && !right) return;
 
+    // DÉMARRAGE
+    if (snake.vx === 0 && snake.vy === 0) {
+        if (up) { snake.vx = 0; snake.vy = -BASE_SPEED; }
+        if (down) { snake.vx = 0; snake.vy = BASE_SPEED; }
+        if (left) { snake.vx = -BASE_SPEED; snake.vy = 0; }
+        if (right) { snake.vx = BASE_SPEED; snake.vy = 0; }
+        Sound.startMusic();
+        return;
+    }
+
     let lastDir = snake.inputQueue.length > 0 
         ? snake.inputQueue[snake.inputQueue.length - 1] 
         : { x: Math.sign(snake.vx), y: Math.sign(snake.vy) };
 
-    if (snake.inputQueue.length >= 2) return;
+    if (snake.inputQueue.length >= 3) return;
 
     let next = null;
     if (up && lastDir.y === 0) next = { x: 0, y: -1 };
@@ -266,16 +334,30 @@ function handleInput(e) {
     }
 }
 
+function handleInputRelease(e) {
+    if (e.code === 'Space') {
+        snake.dashing = false;
+    }
+}
+
 function checkCollisions() {
+    if (snake.vx === 0 && snake.vy === 0) return;
+
+    // Murs
     if (snake.x < 0 || snake.x >= state.width || snake.y < 0 || snake.y >= state.height) return gameOver();
     
-    const safeZone = 40; 
-    const step = 4;
-    for (let i = safeZone; i < snake.trail.length; i += step) {
-        const p = snake.trail[i];
-        if (Math.abs(snake.x - p.x) < 5 && Math.abs(snake.y - p.y) < 5) return gameOver();
+    // Soi-même (INVINCIBLE SI DASH)
+    if (!snake.dashing) {
+        const safeZone = 40; 
+        // On augmente le pas de vérification car le serpent peut aller vite
+        const step = snake.dashing ? 8 : 4; 
+        for (let i = safeZone; i < snake.trail.length; i += step) {
+            const p = snake.trail[i];
+            if (Math.abs(snake.x - p.x) < 5 && Math.abs(snake.y - p.y) < 5) return gameOver();
+        }
     }
     
+    // Manger
     const dist = Math.hypot(
         (snake.x + SETTINGS.grid/2) - (energy.x + SETTINGS.grid/2),
         (snake.y + SETTINGS.grid/2) - (energy.y + SETTINGS.grid/2)
@@ -285,9 +367,14 @@ function checkCollisions() {
 
 function eatEnergy() {
     state.score++;
-    document.getElementById('score').innerText = state.score.toString().padStart(3, '0');
+    snake.stamina = Math.min(100, snake.stamina + 20); 
+    
+    scoreElement.innerText = state.score.toString().padStart(3, '0');
+    
     Sound.eat();
-    for(let i=0; i<15; i++) spawnParticle(energy.x + SETTINGS.grid/2, energy.y + SETTINGS.grid/2, '#ff0055');
+    
+    for(let i=0; i<10; i++) spawnParticle(energy.x + SETTINGS.grid/2, energy.y + SETTINGS.grid/2, '#ff0055');
+    
     spawnEnergy();
 }
 
@@ -343,7 +430,6 @@ function draw() {
     for(let x=0; x<=state.width; x+=SETTINGS.grid) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,state.height); ctx.stroke(); }
     for(let y=0; y<=state.height; y+=SETTINGS.grid) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(state.width,y); ctx.stroke(); }
 
-    // Fond Animé
     ctx.strokeStyle = 'rgba(31, 121, 36, 0.15)'; ctx.lineWidth = 2;
     circuitLines.forEach(line => {
         ctx.beginPath(); ctx.moveTo(line.x, line.y);
@@ -354,7 +440,7 @@ function draw() {
     if (state.running) {
         const cx = SETTINGS.grid / 2;
         
-        // NOURRITURE (Hexagone)
+        // NOURRITURE
         const fx = energy.x + cx;
         const fy = energy.y + cx;
         energy.angle += 0.05;
@@ -371,42 +457,46 @@ function draw() {
         ctx.restore();
 
         // SERPENT
-        if(snake.trail.length > 1) {
-            const offset = SETTINGS.grid / 2;
+        const offset = SETTINGS.grid / 2;
+        
+        // Couleur dynamique (Vert normal, Cyan si Dash)
+        const mainColor = snake.dashing ? '#00ffff' : '#00ffaa';
+        const shadowColor = snake.dashing ? '#00ffff' : '#00ffaaff';
+        
+        if(snake.trail.length > 0) {
+            // Si on dash, on espace moins les points pour pas faire de trous
+            const currentSpeed = snake.dashing ? DASH_SPEED : BASE_SPEED;
+            const step = Math.max(1, Math.floor(SETTINGS.baseSize / currentSpeed));
             
-            // Corps (Modules)
-            const step = Math.ceil(8 / GAME_SPEED * 2); 
-            
-            for(let i=step; i<snake.trail.length; i+=step) {
+            for(let i=0; i<snake.trail.length; i+=step) {
                 const p = snake.trail[i];
                 const ratio = i / snake.trail.length;
                 const size = SETTINGS.baseSize * (1 - ratio * 0.6); 
                 
-                ctx.shadowBlur = 15; ctx.shadowColor = '#00ffaaff';
-                ctx.fillStyle = '#00ffaaff'; 
+                ctx.shadowBlur = snake.dashing ? 25 : 15; // Plus de glow si dash
+                ctx.shadowColor = shadowColor;
+                ctx.fillStyle = shadowColor; 
                 ctx.beginPath(); ctx.arc(p.x + offset, p.y + offset, size/2, 0, Math.PI*2); ctx.fill();
                 
+                // Centre blanc
                 ctx.shadowBlur = 0; ctx.fillStyle = '#fff';
                 ctx.beginPath(); ctx.arc(p.x + offset, p.y + offset, size/4, 0, Math.PI*2); ctx.fill();
             }
-
-            // Tête
-            ctx.save();
-            ctx.translate(snake.x + offset, snake.y + offset);
-            let angle = snake.vx > 0 ? 0 : snake.vx < 0 ? Math.PI : snake.vy > 0 ? Math.PI/2 : -Math.PI/2;
-            ctx.rotate(angle);
-            
-            ctx.shadowBlur = 20; ctx.shadowColor = '#00ffaaff';
-            ctx.fillStyle = '#002233'; ctx.strokeStyle = '#00ffaaff'; ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(18, 0); ctx.lineTo(-8, 14); ctx.lineTo(-4, 0); ctx.lineTo(-8, -14);
-            ctx.closePath(); ctx.fill(); ctx.stroke();
-            
-            ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(4, -5, 2, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(4, 5, 2, 0, Math.PI*2); ctx.fill();
-            ctx.restore();
         }
+
+        // Tête
+        ctx.save();
+        ctx.translate(snake.x + offset, snake.y + offset);
+        let angle = -Math.PI/2; 
+        if (snake.vx > 0) angle = 0; else if (snake.vx < 0) angle = Math.PI; else if (snake.vy > 0) angle = Math.PI/2;
+        ctx.rotate(angle);
+        
+        ctx.shadowBlur = 20; ctx.shadowColor = shadowColor;
+        ctx.fillStyle = '#002233'; ctx.strokeStyle = shadowColor; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(18, 0); ctx.lineTo(-8, 14); ctx.lineTo(-4, 0); ctx.lineTo(-8, -14);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
 
         particles.forEach(p => {
             ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
