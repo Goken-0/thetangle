@@ -12,7 +12,7 @@
 
 Le jeu se distingue par son ambiance **Dark Synthwave**, son moteur audio procédural (Chiptune généré par le code) et ses visuels néons fluides.
 
-<img width="2554" height="1269" alt="game-preview" src="https://github.com/user-attachments/assets/a61c5a9b-4a0c-4dcb-851a-3c95704ff2b7"/>
+<img width="2559" height="1275" alt="game-preview" src="https://github.com/user-attachments/assets/888d57e5-a1ea-4115-bb5b-a5d22ebfb4b2" />
 
 ## ✨ Fonctionnalités
 
@@ -83,4 +83,5 @@ const GAME_SPEED = 2;   // Vitesse de déplacement
 ```
 
 <div align="center"> <small>Fait avec ❤️ par Goken-0 - 2025</small> </div>
+
 
