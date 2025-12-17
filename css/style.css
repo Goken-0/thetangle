@@ -67,7 +67,7 @@ body::before {
 
 /* === GAME BOX === */
 .game-box {
-    width: 804px; /* +4px border */
+    width: 808px;
     background: #000;
     border: 4px solid var(--border); /* Bordures plus épaisses style rétro */
     box-shadow: 0 0 0 4px #000, 0 0 20px rgba(0, 255, 157, 0.2);
@@ -117,7 +117,7 @@ body::before {
 /* === CANVAS === */
 .canvas-wrapper {
     position: relative;
-    width: 800px; height: 600px;
+    width: 800px; height: 576px;
     background: #000;
     overflow: hidden;
 }
@@ -215,4 +215,61 @@ button:active { transform: translate(4px, 4px); box-shadow: none; }
     80% { transform: translate(-1px, -1px) rotate(1deg); }
     90% { transform: translate(1px, 2px) rotate(0deg); }
     100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+/* === STAMINA BAR (DASH) === */
+.stamina-container {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-start;
+}
+
+.stamina-bar-bg {
+    width: 150px;
+    height: 8px;
+    background: #111;
+    border: 1px solid #444;
+    padding: 1px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+.stamina-bar-fill {
+    width: 100%;
+    height: 100%;
+    background: #00ffff; /* Cyan électrique */
+    box-shadow: 0 0 8px #00ffff;
+    transition: width 0.1s linear, background 0.3s;
+}
+
+/* Quand le dash est vide/en recharge */
+.stamina-low {
+    background: #555 !important;
+    box-shadow: none !important;
+}
+
+/* === AJOUT POUR L'INDICATION DASH === */
+.action-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 30px; /* Espace avant le bouton Start */
+}
+
+/* Touche Espace plus large */
+.k-space {
+    width: 120px !important;
+    height: 30px;
+    font-size: 0.6rem;
+}
+
+/* Texte "= DASH" en bleu néon */
+.action-label {
+    color: #00ffff;
+    font-size: 0.8rem;
+    font-family: 'Press Start 2P', cursive;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+    animation: blink 2s infinite;
 }
