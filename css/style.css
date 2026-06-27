@@ -123,11 +123,16 @@ body::before {
 }
 canvas { display: block; image-rendering: pixelated; }
 
-/* === HUD === */
-.hud { position: absolute; top: 20px; left: 20px; pointer-events: none; }
+/* === HUD (barre dédiée, hors zone de jeu) === */
+.hud {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 20px;
+    background: var(--bg-panel);
+    border-bottom: 2px solid var(--border);
+}
 .hud-item {
     display: flex; align-items: center; gap: 15px;
-    color: #fff; font-size: 1rem; 
+    color: #fff; font-size: 1rem;
     text-shadow: 2px 2px 0 #000;
 }
 .icon-svg { width: 30px; height: 30px; color: var(--secondary); filter: drop-shadow(2px 2px 0px #000); }
@@ -219,11 +224,10 @@ button:active { transform: translate(4px, 4px); box-shadow: none; }
 
 /* === STAMINA BAR (DASH) === */
 .stamina-container {
-    margin-top: 10px;
     display: flex;
-    flex-direction: column;
-    gap: 5px;
-    align-items: flex-start;
+    flex-direction: row;
+    gap: 10px;
+    align-items: center;
 }
 
 .stamina-bar-bg {
