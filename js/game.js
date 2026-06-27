@@ -11,8 +11,11 @@ const SETTINGS = {
     glow: true
 };
 
-const BASE_SPEED = 2; // Vitesse normale
-const DASH_SPEED = 4; // Vitesse turbo (Doit être un diviseur de 32 : 4, 8, 16)
+// Vitesse en pixels par pas logique (60 Hz). Plus c'est haut, plus le virage répond vite.
+// Doit rester un diviseur de SETTINGS.grid (32) -> valeurs valides : 1,2,4,8,16.
+// Latence max d'un virage = grid / BASE_SPEED pas. À 4 -> 8 pas (~133ms). À 8 -> 4 pas (~66ms, très réactif mais rapide).
+const BASE_SPEED = 4; // Vitesse normale
+const DASH_SPEED = 8; // Vitesse turbo
 
 // État Global
 let state = {
@@ -41,7 +44,10 @@ let snake = {
 
 let energy = { x: 0, y: 0, angle: 0 };
 let particles = [];
-let circuitLines = []; 
+let circuitLines = [];
+
+// Canvas hors-écran : la grille est statique, on la dessine UNE fois puis on la recopie.
+let gridCanvas = null;
 
 // === MOTEUR AUDIO ===
 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -172,7 +178,25 @@ function init() {
     requestAnimationFrame(loop);
 }
 
+function buildGridCanvas() {
+    gridCanvas = document.createElement('canvas');
+    gridCanvas.width = state.width;
+    gridCanvas.height = state.height;
+    const g = gridCanvas.getContext('2d');
+
+    g.fillStyle = '#050505';
+    g.fillRect(0, 0, state.width, state.height);
+
+    g.strokeStyle = 'rgba(0, 255, 157, 0.04)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (let x = 0; x <= state.width; x += SETTINGS.grid) { g.moveTo(x, 0); g.lineTo(x, state.height); }
+    for (let y = 0; y <= state.height; y += SETTINGS.grid) { g.moveTo(0, y); g.lineTo(state.width, y); }
+    g.stroke();
+}
+
 function initBackground() {
+    buildGridCanvas();
     circuitLines = [];
     for(let i=0; i<25; i++) {
         circuitLines.push({
@@ -187,6 +211,9 @@ function initBackground() {
 }
 
 function startGame() {
+    // Réveille le moteur audio (bloqué par les navigateurs tant qu'il n'y a pas d'interaction)
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
     state.running = true;
     state.score = 0;
     
@@ -220,15 +247,33 @@ function startGame() {
 }
 
 // === LOGIQUE ===
-function loop() {
-    if (state.running) {
-        updateSnake();
-        checkCollisions();
+// Pas de temps fixe : la logique tourne à 60 Hz quel que soit le FPS d'affichage.
+// Découple la vitesse du serpent du framerate -> même comportement sur tous les PC.
+const STEP_MS = 1000 / 60;
+let lastTime = 0;
+let accumulator = 0;
+
+function loop(now) {
+    if (!lastTime) lastTime = now;
+    let frameTime = now - lastTime;
+    lastTime = now;
+
+    // Sécurité : si l'onglet a freezé (gros lag/alt-tab), on évite la "spirale de la mort"
+    if (frameTime > 250) frameTime = 250;
+    accumulator += frameTime;
+
+    while (accumulator >= STEP_MS) {
+        if (state.running) {
+            updateSnake();
+            checkCollisions();
+        }
+        updateParticles();
+        updateBackground();
+        state.frames++;
+        accumulator -= STEP_MS;
     }
-    updateParticles();
-    updateBackground();
+
     draw();
-    state.frames++;
     requestAnimationFrame(loop);
 }
 
@@ -422,20 +467,17 @@ function updateBackground() {
 
 // === DESSIN VISUEL ===
 function draw() {
-    ctx.fillStyle = '#050505';
-    ctx.fillRect(0, 0, state.width, state.height);
-    
-    // Grille
-    ctx.strokeStyle = 'rgba(0, 255, 157, 0.04)'; ctx.lineWidth = 1;
-    for(let x=0; x<=state.width; x+=SETTINGS.grid) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,state.height); ctx.stroke(); }
-    for(let y=0; y<=state.height; y+=SETTINGS.grid) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(state.width,y); ctx.stroke(); }
+    // Fond + grille : recopie de l'image pré-rendue (1 seule opération au lieu de ~50 traits)
+    ctx.drawImage(gridCanvas, 0, 0);
 
+    // Lignes de circuit (animées) : un seul beginPath/stroke pour toutes
     ctx.strokeStyle = 'rgba(31, 121, 36, 0.15)'; ctx.lineWidth = 2;
+    ctx.beginPath();
     circuitLines.forEach(line => {
-        ctx.beginPath(); ctx.moveTo(line.x, line.y);
+        ctx.moveTo(line.x, line.y);
         if(line.dir === 0) ctx.lineTo(line.x + line.length, line.y); else ctx.lineTo(line.x, line.y + line.length);
-        ctx.stroke();
     });
+    ctx.stroke();
 
     if (state.running) {
         const cx = SETTINGS.grid / 2;
@@ -467,19 +509,25 @@ function draw() {
             // Si on dash, on espace moins les points pour pas faire de trous
             const currentSpeed = snake.dashing ? DASH_SPEED : BASE_SPEED;
             const step = Math.max(1, Math.floor(SETTINGS.baseSize / currentSpeed));
-            
+
+            // PASSE 1 : tous les corps lumineux (shadowBlur réglé UNE fois, pas par segment)
+            ctx.shadowBlur = snake.dashing ? 25 : 15;
+            ctx.shadowColor = shadowColor;
+            ctx.fillStyle = shadowColor;
             for(let i=0; i<snake.trail.length; i+=step) {
                 const p = snake.trail[i];
                 const ratio = i / snake.trail.length;
-                const size = SETTINGS.baseSize * (1 - ratio * 0.6); 
-                
-                ctx.shadowBlur = snake.dashing ? 25 : 15; // Plus de glow si dash
-                ctx.shadowColor = shadowColor;
-                ctx.fillStyle = shadowColor; 
+                const size = SETTINGS.baseSize * (1 - ratio * 0.6);
                 ctx.beginPath(); ctx.arc(p.x + offset, p.y + offset, size/2, 0, Math.PI*2); ctx.fill();
-                
-                // Centre blanc
-                ctx.shadowBlur = 0; ctx.fillStyle = '#fff';
+            }
+
+            // PASSE 2 : tous les centres blancs (sans glow)
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff';
+            for(let i=0; i<snake.trail.length; i+=step) {
+                const p = snake.trail[i];
+                const ratio = i / snake.trail.length;
+                const size = SETTINGS.baseSize * (1 - ratio * 0.6);
                 ctx.beginPath(); ctx.arc(p.x + offset, p.y + offset, size/4, 0, Math.PI*2); ctx.fill();
             }
         }
