@@ -12,7 +12,13 @@
 
 Le jeu se distingue par son ambiance **Dark Synthwave**, son moteur audio procédural (Chiptune généré par le code) et ses visuels néons fluides.
 
-<img width="2559" height="1275" alt="game-preview" src="https://github.com/user-attachments/assets/888d57e5-a1ea-4115-bb5b-a5d22ebfb4b2" />
+  <p align="center">
+    <a href="https://goken-0.github.io/thetangle/">
+      <img src="https://img.shields.io/badge/Tester_le_jeu-000000?style=for-the-badge&logo=github&logoColor=white" alt="Live Demo">
+    </a>
+  </p>
+
+<img width="2555" height="1271" alt="image" src="https://github.com/user-attachments/assets/fe3f3e2b-c433-4583-a810-83c35de31160" />
 
 ## ✨ Fonctionnalités
 
